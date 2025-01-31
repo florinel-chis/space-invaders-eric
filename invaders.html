@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Space Invaders</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            background: black;
+        }
+        #gameContainer {
+            text-align: center;
+        }
+        #score {
+            color: white;
+            font-family: Arial;
+            font-size: 20px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body style="background: #333;">
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <div id="score">Score: 0</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        const playerImage = new Image();
+        // Original image is 500x400, no need to specify dimensions in placeholder
+        playerImage.src = 'eric-ship1.png';
+        
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 200,  // Adjusted to accommodate larger height
+            width: 250,              // Half of original 500 to keep it reasonable
+            height: 200,             // Half of original 400 to keep it reasonable
+            speed: 5
+        };
+
+        const bullets = []; // Array to store multiple bullets
+        const BULLET_SPEED = 7;
+        const FIRE_RATE = 200; // ms between shots
+        let lastShot = 0;
+
+        const enemies = [];
+        const enemyRows = 3;
+        const enemyColumns = 8;
+        const enemyWidth = 30;
+        const enemyHeight = 30;
+        const enemyPadding = 20;
+        let enemyDirection = 0.5;
+        let enemyStepDown = false;
+
+        let score = 0;
+        let keys = {};
+
+        function initEnemies() {
+            for (let row = 0; row < enemyRows; row++) {
+                for (let col = 0; col < enemyColumns; col++) {
+                    enemies.push({
+                        x: col * (enemyWidth + enemyPadding) + enemyPadding,
+                        y: row * (enemyHeight + enemyPadding) + enemyPadding,
+                        width: enemyWidth,
+                        height: enemyHeight,
+                        alive: true
+                    });
+                }
+            }
+        }
+
+        document.addEventListener('keydown', (e) => keys[e.key] = true);
+        document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+        function movePlayer() {
+            if (keys['ArrowLeft'] && player.x > 0) {
+                player.x -= player.speed;
+            }
+            if (keys['ArrowRight'] && player.x < canvas.width - player.width) {
+                player.x += player.speed;
+            }
+            
+            const now = Date.now();
+            if (keys[' '] && now - lastShot > FIRE_RATE) {
+                bullets.push({
+                    x: player.x + player.width / 2,
+                    y: player.y,
+                    width: 3,
+                    height: 15
+                });
+                lastShot = now;
+            }
+        }
+
+        function moveEnemies() {
+            let touchedEdge = false;
+            enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+                
+                if (enemyStepDown) {
+                    enemy.y += 10;
+                } else {
+                    enemy.x += 2 * enemyDirection;
+                    if (enemy.x <= 0 || enemy.x >= canvas.width - enemy.width) {
+                        touchedEdge = true;
+                    }
+                }
+            });
+
+            if (touchedEdge && !enemyStepDown) {
+                enemyStepDown = true;
+                enemyDirection *= -1;
+            } else {
+                enemyStepDown = false;
+            }
+        }
+
+        function moveBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y -= BULLET_SPEED;
+                if (bullets[i].y < -bullets[i].height) {
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+
+        function checkCollisions() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                for (let enemy of enemies) {
+                    if (!enemy.alive) continue;
+
+                    if (bullet.x >= enemy.x && 
+                        bullet.x <= enemy.x + enemy.width &&
+                        bullet.y >= enemy.y && 
+                        bullet.y <= enemy.y + enemy.height) {
+                        enemy.alive = false;
+                        bullets.splice(i, 1);
+                        score += 10;
+                        scoreElement.textContent = `Score: ${score}`;
+                        break;
+                    }
+                }
+            }
+        }
+
+        function checkGameOver() {
+            return enemies.some(enemy => 
+                enemy.alive && enemy.y + enemy.height >= player.y);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+
+            ctx.fillStyle = '#fff';
+            bullets.forEach(bullet => {
+                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+            });
+
+            ctx.fillStyle = '#ff0000';
+            enemies.forEach(enemy => {
+                if (enemy.alive) {
+                    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                }
+            });
+        }
+
+        function update() {
+            movePlayer();
+            moveEnemies();
+            moveBullets();
+            checkCollisions();
+            draw();
+
+            if (checkGameOver()) {
+                alert('Game Over! Score: ' + score);
+                resetGame();
+            } else {
+                requestAnimationFrame(update);
+            }
+        }
+
+        function resetGame() {
+            enemies.length = 0;
+            bullets.length = 0;
+            score = 0;
+            scoreElement.textContent = 'Score: 0';
+            player.x = canvas.width / 2;
+            initEnemies();
+            requestAnimationFrame(update);
+        }
+
+        initEnemies();
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
